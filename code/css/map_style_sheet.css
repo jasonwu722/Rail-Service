@@ -34,7 +34,6 @@ h3{
   background: #FFF4E4;
 }
 
-/* The Modal (background) */
 .modal {
   display: none; 
   position: fixed; 
@@ -48,7 +47,6 @@ h3{
   padding-top: 60px; 
 }
   
-/* Modal Content */
 .modal-content {
   color: #000000;
   background-color: #FFF4E4;
@@ -56,7 +54,7 @@ h3{
   padding: 20px;
   border: none;
   border-radius: 2vw;
-  width: 80%; 
+  width: 50%; 
 }
 
 .modal-content ul{

@@ -10,9 +10,11 @@
 ({
   key: "AIzaSyA14vcofDMOWim99Ojgv_FRfmM-OedFq9E",
   v: "weekly",
+  language: "en",
+  region: "GB"
 })
 
-async function fetch_departure_board(CRS_code) {
+async function fetchDepartureBoard(CRS_code) {
   const rail_API_key = {
     "x-apikey": "3GzgOrw0GLYmOxtEppcxG8ZNhbGt5SJz3BMcyfU06spaOONd",
   }
@@ -37,13 +39,13 @@ async function fetch_departure_board(CRS_code) {
   }
 }
 
-function display_departure_board(data, station_name) {
+function displayDepartureBoard(data, stationName) {
   if (!data.trainServices) {
-    return 'No data available'
-  }  
+    return stationName + ': No Data Available'
+  }
 
   const services = data.trainServices
-  let output = `<h3>${station_name}</h3><ul class="infowindow">`
+  let output = `<h3>${stationName}</h3><ul class="infowindow">`
   
   services.forEach(service => {
     const origin = service.origin[0].locationName || 'Unknown Origin'
@@ -52,7 +54,6 @@ function display_departure_board(data, station_name) {
     const expected_departure = service.etd || service.eta || 'Unknown'
     const platform = service.platform || 'Not Available'
     const operator = service.operator || 'Unknown Operator'
-
     const calling_points = (service.subsequentCallingPoints && service.subsequentCallingPoints[0] && service.subsequentCallingPoints[0].callingPoint) || []
     const calling_points_data = calling_points.map(cp => ({
       name: cp.locationName || 'Unknown',
@@ -62,17 +63,18 @@ function display_departure_board(data, station_name) {
 
     const calling_points_str = encodeURIComponent(JSON.stringify(calling_points_data))
 
-    output += `<li><button class="btn" onclick='showTrainInfo("${scheduled_departure}", "${platform}", "${expected_departure}", "${operator}", "${calling_points_str}")'>${scheduled_departure} - ${origin} to ${destination}</button></li>`
+    output += `<li><button class="btn" onclick='showTrainInfo("${origin}", "${destination}", "${scheduled_departure}", "${platform}", "${expected_departure}", "${operator}", "${calling_points_str}")'>${scheduled_departure} - ${origin} to ${destination}</button></li>`
   })
   output += '</ul></div>'
   return output
 }
 
-function showTrainInfo(scheduled_departure, platform, expected_departure, operator, calling_points_str) {
+function showTrainInfo(origin,destination,scheduled_departure, platform, expected_departure, operator, calling_points_str) {
   const callingPoints = JSON.parse(decodeURIComponent(calling_points_str))
 
   const modal_body = document.getElementById('trainModalBody')
   modal_body.innerHTML = `
+    <h4>${origin} to ${destination}</h4>
     <p>Scheduled Time: ${scheduled_departure}</p>
     <p>Platform: ${platform}</p>
     <p>Expected: ${expected_departure}</p>
@@ -104,9 +106,10 @@ async function initMap() {
   const {Map} = await google.maps.importLibrary("maps")
 
   const map_inital_options = {
-    zoom: 8,
     center: { lat: 53.227390, lng: -4.129263},
+    zoom: 12,
     disableDefaultUI: true,
+    zoomControl: true,
     mapId: '3cd293d4d79eba4f'
   }
 
@@ -117,21 +120,40 @@ async function initMap() {
 
   const station_icon = {
     url: "img/station_logo.png",
-    scaledSize: new google.maps.Size(40, 40),
+    scaledSize: new google.maps.Size(45, 45),
     origin: new google.maps.Point(0, 0),
     anchor: new google.maps.Point(0, 30)
   }
 
   const markers = []
 
-  fetch ('assets/uk_train_stations.json')
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const pos = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+
+        map.setCenter(pos);
+      },
+      () => {
+        alert("Please enable location permissions.");
+      }
+    );
+  } else {
+    alert("Your browser doesn't support geolocation.");
+  }
+
+  fetch ('assets/stations_preproccssed.json')
     .then(response => response.json())
     .then(data => {
+      
       for (const stations of data) {
         const station_markers = new google.maps.Marker({
-          position: {lat: stations.latitude, lng: stations.longitude},
+          position: {lat: stations.lat, lng: stations.long},
           map: map,
-          title: stations.station_name,
+          title: stations.stationName,
           icon: station_icon
         })
 
@@ -140,9 +162,8 @@ async function initMap() {
             currentInfoWindow.close()
           }
 
-          const departure_data = await fetch_departure_board(stations.crs)
-          const departure_info = display_departure_board(departure_data, stations.station_name)
-          document.getElementById('trainModalBody').innerHTML = departure_info
+          const departure_data = await fetchDepartureBoard(stations.crsCode)
+          const departure_info = displayDepartureBoard(departure_data, stations.stationName)
 
           const infoWindow = new google.maps.InfoWindow({
             content: departure_info
@@ -152,10 +173,11 @@ async function initMap() {
           currentInfoWindow = infoWindow
         })
 
-        markers.push(station_markers);
+        markers.push(station_markers)
       }
       
-      new markerClusterer.MarkerClusterer({map, markers})
+
+      new markerClusterer.MarkerClusterer({map, markers})      
     })
 }
 
